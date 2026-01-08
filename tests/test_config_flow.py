@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from binascii import Error as BinasciiError
 from typing import TYPE_CHECKING
-from unittest.mock import ANY, AsyncMock, MagicMock, Mock, call
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, call, patch
 from uuid import uuid4
 
 from aiohttp import ClientConnectionError, ClientConnectorSSLError
@@ -20,10 +20,11 @@ from homeassistant.config_entries import SOURCE_IGNORE, SOURCE_USER
 from homeassistant.const import CONF_DESCRIPTION, CONF_DEVICE, CONF_HOST, CONF_NAME
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.selector import SelectOptionDict
-from homeconnect_websocket import ParserError
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
+import pytest
+from homeassistant.core import HomeAssistant
 from .const import (
+    DEVICE_DESCRIPTION,
     MOCK_AES_DEVICE_DESCRIPTION,
     MOCK_AES_DEVICE_ID,
     MOCK_AES_DEVICE_INFO,
@@ -55,9 +56,18 @@ async def test_user_init(
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
 
+    assert result["type"] is FlowResultType.MENU
+    assert result["step_id"] == "user"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "upload"
-    assert not result["errors"]
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -101,6 +111,15 @@ async def test_user_tls(
     monkeypatch.setattr(config_flow, "hc_socket", hc_socket)
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    assert result["type"] is FlowResultType.MENU
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "upload"
@@ -154,6 +173,13 @@ async def test_user_aes(
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
 
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "upload"
     assert not result["errors"]
@@ -206,6 +232,13 @@ async def test_user_select_device(
     mock_config.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "upload"
@@ -261,6 +294,13 @@ async def test_user_select_device_one(
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
 
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "upload"
     assert not result["errors"]
@@ -295,6 +335,13 @@ async def test_user_select_device_ignore(
     mock_config.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
 
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "upload"
@@ -342,6 +389,14 @@ async def test_user_set_host(
     mock_hc_socket.return_value.connect.side_effect = ClientConnectionError()
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -428,6 +483,14 @@ async def test_user_auth_failed_ssl_error(
     )
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -464,6 +527,14 @@ async def test_user_auth_failed_binascii_error(
     mock_hc_socket.return_value.connect.side_effect = BinasciiError()
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -500,6 +571,14 @@ async def test_user_connection_failed_timeout(
     mock_hc_socket.return_value.connect.side_effect = TimeoutError()
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -538,6 +617,14 @@ async def test_user_connection_failed_connection_error(
     mock_hc_socket.return_value.connect.side_effect = ClientConnectionError()
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -567,9 +654,17 @@ async def test_user_invalid_config_parser(
     mock_setup_entry: AsyncMock,
 ) -> None:
     """Test a config flow with error in config parser."""
-    mock_process_profile_file.side_effect = ParserError("Test Error")
+    mock_process_profile_file.side_effect = Exception("Test Error")
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -591,18 +686,14 @@ async def test_user_invalid_profile_no_info(
     mock_process_profile_file.return_value[MOCK_AES_DEVICE_ID] = {}
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
-            CONF_FILE: UPLOADED_FILE,
+            "next_step_id": "upload",
         },
     )
 
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "invalid_profile_file"
-    mock_setup_entry.assert_not_awaited()
-
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -624,6 +715,14 @@ async def test_user_invalid_profile_no_description(
     mock_process_profile_file.return_value[MOCK_AES_DEVICE_ID].pop("description")
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -652,6 +751,14 @@ async def test_user_invalid_profile_info(
     mock_process_profile_file.return_value[MOCK_AES_DEVICE_ID]["info"].pop("key")
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -697,6 +804,14 @@ async def test_user_select_all_setup(
     mock_config.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        user_input={
+            "next_step_id": "upload",
+        },
+    )
+
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         user_input={
@@ -743,3 +858,88 @@ async def test_process_profile(
         any_order=True,
     )
     mock_process_uploaded_file.assert_called_with(ANY, UPLOADED_FILE)
+
+async def test_user_login(
+    hass: HomeAssistant,
+    mock_setup_entry: AsyncMock,
+    monkeypatch: pytest.MonkeyPatch,
+    aioclient_mock: ANY,
+) -> None:
+    """Test config flow with login."""
+    hc_socket = Mock()
+    tls_socket = Mock(return_value=AsyncMock())
+    hc_socket.TlsSocket = tls_socket
+    monkeypatch.setattr(config_flow, "hc_socket", hc_socket)
+
+    with patch("custom_components.homeconnect_ws.config_flow.parse_device_description", return_value=DEVICE_DESCRIPTION):
+        result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
+
+        # Select Login
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                "next_step_id": "login",
+            },
+        )
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "login"
+
+        # Select Region
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                "region": "EU",
+            },
+        )
+
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "auth"
+
+        # Mock Token and Data Fetch
+        aioclient_mock.post(
+            "https://api.home-connect.com/security/oauth/token",
+            json={"access_token": "TEST_TOKEN"},
+        )
+
+        aioclient_mock.get(
+            "https://prod.reu.rest.homeconnectegw.com/account/details",
+            json={
+                "homeAppliances": [
+                    {
+                        "identifier": MOCK_TLS_DEVICE_ID,
+                        "brand": "Test_Brand",
+                        "type": "Test_TLS",
+                        "vib": "Test_vib",
+                        "tls": {"key": MOCK_TLS_DEVICE_INFO["key"]},
+                    }
+                ]
+            },
+        )
+
+        # Use zipfile to create a zip response
+        from zipfile import ZipFile
+        from io import BytesIO
+
+        zip_buffer = BytesIO()
+        with ZipFile(zip_buffer, "w") as zip_file:
+            zip_file.writestr(f"{MOCK_TLS_DEVICE_ID}_FeatureMapping.xml", "dummy")
+            zip_file.writestr(f"{MOCK_TLS_DEVICE_ID}_DeviceDescription.xml", "dummy")
+
+        aioclient_mock.get(
+            f"https://prod.reu.rest.homeconnectegw.com/api/iddf/v1/iddf/{MOCK_TLS_DEVICE_ID}",
+            content=zip_buffer.getvalue(),
+        )
+
+        # Provide Code
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            user_input={
+                "code": "TEST_CODE",
+            },
+        )
+
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert result["title"] == "Test_Brand Test_TLS"
+
+        mock_setup_entry.assert_awaited_once()

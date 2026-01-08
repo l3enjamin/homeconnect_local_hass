@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
 import random
 import re
+import secrets
 from binascii import Error as BinasciiError
+from io import BytesIO
 from typing import TYPE_CHECKING, Any
 from zipfile import ZipFile
 
+import aiohttp
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from aiohttp import ClientConnectionError, ClientConnectorSSLError
@@ -23,6 +28,7 @@ from homeassistant.const import (
     CONF_MODE,
     CONF_NAME,
 )
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     FileSelector,
     FileSelectorConfig,
@@ -32,8 +38,7 @@ from homeassistant.helpers.selector import (
 )
 from homeconnect_websocket import (
     DeviceDescription,
-    ParserError,
-    hc_socket,
+    socket as hc_socket,
     parse_device_description,
 )
 
@@ -50,6 +55,10 @@ if TYPE_CHECKING:
     from . import HCConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+CLIENT_ID = "9B75AC9EC512F36C84256AC47D813E2C1DD0D6520DF774B020E1E6E2EB29B1F3"
+REDIRECT_URI = "hcauth://auth/prod"
+SCOPES = "Control DeleteAppliance IdentifyAppliance Images Monitor ReadAccount ReadOrigApi Settings WriteAppliance WriteOrigApi"
 
 CONFIG_FILE_SCHEMA = vol.Schema(
     {
@@ -71,7 +80,10 @@ CONFIG_HOST_SCHEMA = vol.Schema(
 def process_zip_file(config_path: Path) -> dict[str, dict[str, dict | DeviceDescription]]:
     """Process uploaded zip file."""
     profile_file = ZipFile(config_path)
+    return process_zip_data(profile_file)
 
+def process_zip_data(profile_file: ZipFile) -> dict[str, dict[str, dict | DeviceDescription]]:
+    """Process zip file data."""
     appliances = {}
     re_info = re.compile(".*.json$")
     infolist = profile_file.infolist()
@@ -100,6 +112,17 @@ def process_json_file(config_path: Path) -> dict[str, dict[str, dict | DeviceDes
     return {"config_entry": entry_data["data"]["entry_data"]}
 
 
+def generate_code_verifier() -> str:
+    """Generate PKCE code verifier."""
+    return secrets.token_urlsafe(32)
+
+
+def generate_code_challenge(verifier: str) -> str:
+    """Generate PKCE code challenge."""
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+
 class HomeConnectConfigFlow(ConfigFlow, domain=DOMAIN):
     """HomeConnect Config flow."""
 
@@ -110,6 +133,13 @@ class HomeConnectConfigFlow(ConfigFlow, domain=DOMAIN):
         self.appliances: dict[str, dict[str, dict | DeviceDescription]] = {}
         self.reauth_entry: HCConfigEntry = None
         self.global_config: HCConfig | None = None
+        self.pkce_verifier = None
+        self.region = None
+        self.api_base_url = None
+        self.asset_base_url = None
+        self.token_url = None
+        self.account_details_url = None
+        self.device_info_url = None
 
     def _process_profile_file(
         self, uploaded_file_id: str
@@ -156,7 +186,191 @@ class HomeConnectConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle a flow initialized by the user."""
         _LOGGER.debug("Config flow initialized by user")
         self.global_config = self.hass.data.get(HC_KEY)
-        return await self.async_step_upload()
+
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["login", "upload"]
+        )
+
+    async def async_step_login(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Handle login region selection."""
+        if user_input is not None:
+            self.region = user_input["region"]
+            if self.region == 'EU':
+                self.api_base_url = "https://api.home-connect.com"
+                self.asset_base_url = 'https://prod.reu.rest.homeconnectegw.com'
+            elif self.region == 'NA':
+                self.api_base_url = "https://api-rna.home-connect.com"
+                self.asset_base_url = 'https://prod.rna.rest.homeconnectegw.com'
+            elif self.region == 'CN':
+                self.api_base_url = "https://api.home-connect.cn"
+                self.asset_base_url = 'https://prod.rgc.rest.homeconnectegw.cn'
+            elif self.region == 'RU':
+                self.api_base_url = "https://api-rus.home-connect.com"
+                self.asset_base_url = 'https://prod.rus.rest.homeconnectegw.com'
+
+            self.token_url = self.api_base_url + '/security/oauth/token'
+            self.account_details_url = self.asset_base_url + '/account/details'
+            self.device_info_url = self.asset_base_url + '/api/iddf/v1/iddf/'
+
+            return await self.async_step_auth()
+
+        return self.async_show_form(
+            step_id="login",
+            data_schema=vol.Schema({
+                vol.Required("region", default="EU"): vol.In(["EU", "NA", "CN", "RU"])
+            })
+        )
+
+    async def async_step_auth(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+        """Handle authentication."""
+        if user_input is not None:
+            code_input = user_input["code"]
+            # Extract code if full URL is pasted
+            if "code=" in code_input:
+                try:
+                    match = re.search(r"code=([^&]+)", code_input)
+                    if match:
+                        code = match.group(1)
+                    else:
+                        raise ValueError("No code found in URL")
+                except ValueError:
+                     self.errors["base"] = "invalid_auth"
+                     return await self.async_step_auth()
+            else:
+                code = code_input
+
+            return await self.async_step_fetch(code)
+
+        self.pkce_verifier = generate_code_verifier()
+        code_challenge = generate_code_challenge(self.pkce_verifier)
+
+        params = {
+            "client_id": CLIENT_ID,
+            "response_type": "code",
+            "redirect_uri": REDIRECT_URI,
+            "scope": SCOPES,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+            "prompt": "login"
+        }
+
+        # Build URL manually to ensure order or correct encoding if needed,
+        # though aiohttp or urllib works too.
+        from urllib.parse import urlencode
+        auth_url = f"{self.api_base_url}/security/oauth/authorize?{urlencode(params)}"
+
+        return self.async_show_form(
+            step_id="auth",
+            description_placeholders={"auth_url": auth_url},
+            data_schema=vol.Schema({
+                vol.Required("code"): str
+            }),
+            errors=self.errors
+        )
+
+    async def async_step_fetch(self, code: str) -> FlowResult:
+        """Fetch tokens and profiles."""
+        session = async_get_clientsession(self.hass)
+
+        # 1. Get Token
+        try:
+            token_response = await session.post(
+                self.token_url,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "client_id": CLIENT_ID,
+                    "redirect_uri": REDIRECT_URI,
+                    "code_verifier": self.pkce_verifier
+                }
+            )
+            token_data = await token_response.json()
+            if "access_token" not in token_data:
+                _LOGGER.error("Token response error: %s", token_data)
+                self.errors["base"] = "token_error"
+                return await self.async_step_auth()
+
+            access_token = token_data["access_token"]
+
+        except Exception as e:
+            _LOGGER.exception("Error fetching token")
+            self.errors["base"] = "token_error"
+            return await self.async_step_auth()
+
+        # 2. Get Account Details
+        try:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            account_response = await session.get(self.account_details_url, headers=headers)
+            if account_response.status != 200:
+                 _LOGGER.error("Account details error: %s", await account_response.text())
+                 self.errors["base"] = "fetch_error"
+                 return await self.async_step_auth()
+
+            account_data = await account_response.json()
+            home_appliances = account_data.get("homeAppliances", [])
+
+            self.appliances = {}
+
+            for appliance in home_appliances:
+                 haId = appliance["identifier"]
+
+                 # Construct appliance info similar to what the downloader does
+                 appliance_info = {
+                    "haId": haId,
+                    "type": appliance["type"],
+                    "serialNumber": appliance.get("serialnumber"),
+                    "brand": appliance["brand"],
+                    "vib": appliance["vib"],
+                    "mac": appliance.get("mac"),
+                    "featureMappingFileName": f"{haId}_FeatureMapping.xml",
+                    "deviceDescriptionFileName": f"{haId}_DeviceDescription.xml",
+                 }
+
+                 if "tls" in appliance and "key" in appliance["tls"]:
+                      appliance_info["connectionType"] = "TLS"
+                      appliance_info["key"] = appliance["tls"]["key"]
+                 elif "aes" in appliance and "key" in appliance["aes"]:
+                      appliance_info["connectionType"] = "AES"
+                      appliance_info["key"] = appliance["aes"]["key"]
+                      appliance_info["iv"] = appliance["aes"]["iv"]
+                 else:
+                      _LOGGER.warning("No keys found for appliance %s", haId)
+                      continue
+
+                 # 3. Download Device ZIP
+                 zip_url = f"{self.device_info_url}{haId}"
+                 zip_response = await session.get(zip_url, headers=headers)
+
+                 if zip_response.status == 200:
+                      zip_content = await zip_response.read()
+                      with ZipFile(BytesIO(zip_content)) as z:
+                           # Extract XMLs
+                           try:
+                                description_file = z.open(appliance_info["deviceDescriptionFileName"]).read()
+                                feature_file = z.open(appliance_info["featureMappingFileName"]).read()
+                                appliance_description = parse_device_description(description_file, feature_file)
+
+                                self.appliances[haId] = {
+                                    "info": appliance_info,
+                                    "description": appliance_description,
+                                }
+                           except Exception as e:
+                                _LOGGER.error("Error parsing zip for %s: %s", haId, e)
+                 else:
+                      _LOGGER.error("Failed to download zip for %s: %s", haId, zip_response.status)
+
+        except Exception as e:
+            _LOGGER.exception("Error fetching appliances")
+            self.errors["base"] = "fetch_error"
+            return await self.async_step_auth()
+
+        if not self.appliances:
+            self.errors["base"] = "fetch_error" # Or no appliances found
+            return await self.async_step_auth()
+
+        return await self.async_step_device_select()
+
 
     async def async_step_upload(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle profile file upload."""
@@ -183,10 +397,11 @@ class HomeConnectConfigFlow(ConfigFlow, domain=DOMAIN):
                             self.data[CONF_AES_IV] = None
                             _LOGGER.info("PSK override")
 
-            except ParserError as exc:
+            except Exception as exc:
+                _LOGGER.error("Error parsing profile file: %s", exc)
                 return self.async_abort(
-                    reason="profile_file_parser_error",
-                    description_placeholders={"error": exc.args[0]},
+                     reason="profile_file_parser_error",
+                     description_placeholders={"error": str(exc)},
                 )
             except (KeyError, ValueError):
                 return self.async_abort(reason="invalid_profile_file")
@@ -361,6 +576,6 @@ class HomeConnectConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             )
 
-            return await self.async_step_upload()
+            return await self.async_step_user()
         except KeyError:
             return self.async_abort(reason="invalid_discovery_info")
