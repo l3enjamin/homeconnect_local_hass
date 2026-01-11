@@ -209,6 +209,16 @@ COMMON_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             key="button_mains_power_off",
             entity="BSH.Common.Command.MainsPowerOff",
         ),
+        HCButtonEntityDescription(
+            key="button_allow_software_download",
+            entity="BSH.Common.Command.AllowSoftwareDownload",
+            entity_category=EntityCategory.CONFIG,
+        ),
+        HCButtonEntityDescription(
+            key="button_deactivate_wifi",
+            entity="BSH.Common.Command.DeactivateWiFi",
+            entity_category=EntityCategory.CONFIG,
+        ),
     ],
     "binary_sensor": [
         HCBinarySensorEntityDescription(
@@ -261,6 +271,18 @@ COMMON_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             key="binary_sensor_interior_illumination",
             entity="BSH.Common.Status.InteriorIlluminationActive",
             entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        HCBinarySensorEntityDescription(
+            key="binary_sensor_backend_connected",
+            entity="BSH.Common.Status.BackendConnected",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        HCBinarySensorEntityDescription(
+            key="binary_sensor_software_update_available",
+            entity="BSH.Common.Event.SoftwareUpdateAvailable",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            value_on={"Present", "Confirmed"},
+            value_off={"Off"},
         ),
     ],
     "select": [
@@ -396,6 +418,12 @@ COMMON_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity_category=EntityCategory.DIAGNOSTIC,
             entity_registry_enabled_default=False,
         ),
+        HCSensorEntityDescription(
+            key="sensor_software_update_transaction_id",
+            entity="BSH.Common.Status.SoftwareUpdateTransactionID",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            entity_registry_enabled_default=False,
+        ),
         generate_door_state,
     ],
     "start_button": [generate_start_button],
@@ -403,6 +431,12 @@ COMMON_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
         HCSwitchEntityDescription(
             key="switch_child_lock",
             entity="BSH.Common.Setting.ChildLock",
+            device_class=SwitchDeviceClass.SWITCH,
+        ),
+        HCSwitchEntityDescription(
+            key="switch_allow_backend_connection",
+            entity="BSH.Common.Setting.AllowBackendConnection",
+            entity_category=EntityCategory.CONFIG,
             device_class=SwitchDeviceClass.SWITCH,
         ),
     ],

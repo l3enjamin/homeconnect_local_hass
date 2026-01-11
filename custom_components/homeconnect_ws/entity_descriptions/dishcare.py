@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+from homeassistant.components.number import NumberDeviceClass
 from homeassistant.components.sensor import (
     SensorDeviceClass,
+    SensorStateClass,
 )
 from homeassistant.components.switch import SwitchDeviceClass
 from homeassistant.const import EntityCategory
 
 from .descriptions_definitions import (
     HCBinarySensorEntityDescription,
+    HCNumberEntityDescription,
     HCSelectEntityDescription,
     HCSensorEntityDescription,
     HCSwitchEntityDescription,
@@ -119,6 +122,26 @@ DISHCARE_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity_category=EntityCategory.DIAGNOSTIC,
             device_class=BinarySensorDeviceClass.PROBLEM,
             entity_registry_enabled_default=False,
+            value_on={"Present", "Confirmed"},
+            value_off={"Off"},
+        ),
+        HCBinarySensorEntityDescription(
+            key="binary_sensor_remote_control_active",
+            entity="BSH.Common.Status.RemoteControlActive",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        HCBinarySensorEntityDescription(
+            key="binary_sensor_program_finished_sanitized",
+            entity="Dishcare.Dishwasher.Event.ProgramFinishedSanitized",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            value_on={"Present", "Confirmed"},
+            value_off={"Off"},
+        ),
+        HCBinarySensorEntityDescription(
+            key="binary_sensor_internal_error",
+            entity="Dishcare.Dishwasher.Event.InternalError",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            device_class=BinarySensorDeviceClass.PROBLEM,
             value_on={"Present", "Confirmed"},
             value_off={"Off"},
         ),
@@ -275,6 +298,33 @@ DISHCARE_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             device_class=SensorDeviceClass.ENUM,
             has_state_translation=True,
         ),
+        HCSensorEntityDescription(
+            key="sensor_remote_control_start_allowed_since",
+            entity="BSH.Common.Status.RemoteControlStartAllowedSince",
+            device_class=SensorDeviceClass.TIMESTAMP,
+            entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        HCSensorEntityDescription(
+            key="sensor_silence_on_demand_remaining_time",
+            entity="Dishcare.Dishwasher.Status.SilenceOnDemandRemainingTime",
+            device_class=SensorDeviceClass.DURATION,
+            state_class=SensorStateClass.MEASUREMENT,
+        ),
+        HCSensorEntityDescription(
+            key="sensor_process_technology",
+            entity="Dishcare.Dishwasher.Status.ProcessTechnology",
+            device_class=SensorDeviceClass.ENUM,
+            entity_category=EntityCategory.DIAGNOSTIC,
+            has_state_translation=True,
+        ),
+    ],
+    "number": [
+        HCNumberEntityDescription(
+            key="number_silence_on_demand_default_time",
+            entity="Dishcare.Dishwasher.Setting.SilenceOnDemandDefaultTime",
+            device_class=NumberDeviceClass.DURATION,
+            entity_category=EntityCategory.CONFIG,
+        ),
     ],
     "switch": [
         HCSwitchEntityDescription(
@@ -344,6 +394,16 @@ DISHCARE_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
         HCSwitchEntityDescription(
             key="switch_extra_rinse",
             entity="Dishcare.Dishwasher.Option.ExtraRinse",
+            device_class=SwitchDeviceClass.SWITCH,
+        ),
+        HCSwitchEntityDescription(
+            key="switch_vario_speed",
+            entity="Dishcare.Dishwasher.Option.VarioSpeed",
+            device_class=SwitchDeviceClass.SWITCH,
+        ),
+        HCSwitchEntityDescription(
+            key="switch_energy_safe",
+            entity="Dishcare.Dishwasher.Option.EnergySafe",
             device_class=SwitchDeviceClass.SWITCH,
         ),
     ],
