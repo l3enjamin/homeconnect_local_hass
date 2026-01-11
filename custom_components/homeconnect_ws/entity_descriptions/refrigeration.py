@@ -1,4 +1,4 @@
-"""Description for Cooking Entities."""
+"""Description for Refrigeration Entities."""
 
 from __future__ import annotations
 
@@ -162,6 +162,14 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             value_on={"Present", "Confirmed"},
             value_off={"Off"},
         ),
+        HCBinarySensorEntityDescription(
+            key="binary_sensor_appliance_error",
+            entity="Refrigeration.Common.Event.ApplianceError",
+            entity_category=EntityCategory.DIAGNOSTIC,
+            device_class=BinarySensorDeviceClass.PROBLEM,
+            value_on={"Present", "Confirmed"},
+            value_off={"Off"},
+        ),
     ],
     "sensor": [
         HCSensorEntityDescription(
@@ -190,6 +198,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.FridgeFreezer.Setting.SetpointTemperatureFreezer",
             native_unit_of_measurement=UnitOfTemperature.CELSIUS,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             mode=NumberMode.AUTO,
             step=1,
         ),
@@ -198,6 +207,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.FridgeFreezer.Setting.SetpointTemperatureRefrigerator",
             native_unit_of_measurement=UnitOfTemperature.CELSIUS,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             mode=NumberMode.AUTO,
             step=1,
         ),
@@ -206,6 +216,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.Common.Setting.Freezer.SetpointTemperature",
             native_unit_of_measurement=UnitOfTemperature.CELSIUS,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             mode=NumberMode.AUTO,
             step=1,
         ),
@@ -215,6 +226,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.Common.Setting.Freezer.SetpointTemperatureFahrenheit",
             native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             mode=NumberMode.AUTO,
             step=1,
         ),
@@ -223,6 +235,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.Common.Setting.Refrigerator.SetpointTemperature",
             native_unit_of_measurement=UnitOfTemperature.CELSIUS,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             mode=NumberMode.AUTO,
             step=1,
         ),
@@ -232,6 +245,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.Common.Setting.Refrigerator.SetpointTemperatureFahrenheit",
             native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             mode=NumberMode.AUTO,
             step=1,
         ),
@@ -241,6 +255,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.Common.Setting.ChillerCommon.SetpointTemperature",
             native_unit_of_measurement=UnitOfTemperature.CELSIUS,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             entity_registry_enabled_default=False,
             mode=NumberMode.AUTO,
             step=1,
@@ -252,6 +267,7 @@ REFRIGERATION_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity="Refrigeration.Common.Setting.ChillerCommon.SetpointTemperatureFahrenheit",
             native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
             device_class=NumberDeviceClass.TEMPERATURE,
+            entity_category=EntityCategory.CONFIG,
             entity_registry_enabled_default=False,
             mode=NumberMode.AUTO,
             step=1,
