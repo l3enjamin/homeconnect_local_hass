@@ -293,13 +293,6 @@ COMMON_ENTITY_DESCRIPTIONS: _EntityDescriptionsDefinitionsType = {
             entity_registry_enabled_default=False,
             has_state_translation=True,
         ),
-        HCSelectEntityDescription(
-            key="select_remote_control_level",
-            entity="BSH.Common.Setting.RemoteControlLevel",
-            entity_category=EntityCategory.CONFIG,
-            entity_registry_enabled_default=False,
-            has_state_translation=True,
-        ),
         generate_temperature_unit,
     ],
     "sensor": [
