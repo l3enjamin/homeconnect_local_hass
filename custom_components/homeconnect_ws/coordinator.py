@@ -118,7 +118,9 @@ class HomeConnectCoordinator(DataUpdateCoordinator):
             if not self._reconnecting:
                 self._reconnecting = True
                 reconnect_timeout = int(self.hass.loop.time()) + MAX_RECONNECT_TIME
-                self.hass.loop.call_at(reconnect_timeout, self._connection_reconnect_callback)
+                self._reconnect_timer = self.hass.loop.call_at(
+                    reconnect_timeout, self._connection_reconnect_callback
+                )
 
         elif event == ConnectionState.CONNECTED:
             self.connected = True
