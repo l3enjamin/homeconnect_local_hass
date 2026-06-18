@@ -72,6 +72,9 @@ class HomeConnectCoordinator(DataUpdateCoordinator):
 
     async def close(self) -> None:
         self._connecting = False
+        if self._reconnect_timer:
+            self._reconnect_timer.cancel()
+            self._reconnect_timer = None
         await self.appliance.close()
 
     async def _async_setup(self) -> None:
