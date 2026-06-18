@@ -14,7 +14,6 @@ from .const import DOMAIN
 
 if TYPE_CHECKING:
     import re
-    from collections.abc import Callable, Coroutine
 
     from homeassistant.core import HomeAssistant, ServiceCall
     from homeconnect_websocket import HomeAppliance
