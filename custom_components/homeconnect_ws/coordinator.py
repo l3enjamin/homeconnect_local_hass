@@ -82,13 +82,14 @@ class HomeConnectCoordinator(DataUpdateCoordinator):
             "Connecting to %s", self.config_entry.data[CONF_DESCRIPTION]["info"].get("vib")
         )
         first_failure = True
-        while self._connecting:
+        while self._connecting: 
             try:
                 await self.appliance.connect()
                 if self.appliance.session.connected:
                     self.connected = True  # FIX
                     self.async_set_updated_data(None)  # FIX
                     return
+                await asyncio.sleep(5)
             except (ConnectionFailedError, HCHandshakeError):
                 await self.appliance.close()
                 msg = f"Can't connect to {self.config_entry.data[CONF_HOST]}, retrying"
