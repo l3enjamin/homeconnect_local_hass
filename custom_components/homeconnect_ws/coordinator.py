@@ -133,7 +133,9 @@ class HomeConnectCoordinator(DataUpdateCoordinator):
                     self.config_entry.data[CONF_DESCRIPTION]["info"].get("vib"),
                 )
                 self._reconnecting = False
-
+                if self._reconnect_timer:
+                    self._reconnect_timer.cancel()
+                    self._reconnect_timer = None
         elif event == ConnectionState.CLOSED:
             self.connected = False
 
