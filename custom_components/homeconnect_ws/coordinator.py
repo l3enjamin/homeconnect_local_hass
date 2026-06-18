@@ -142,6 +142,7 @@ class HomeConnectCoordinator(DataUpdateCoordinator):
         self.async_set_updated_data(None)
 
     def _connection_reconnect_callback(self) -> None:
+        self._reconnect_timer = None
         if not self.appliance.session.connected:
             self.connected = False
             self.async_set_updated_data(None)
